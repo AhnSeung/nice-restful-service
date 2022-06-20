@@ -1,0 +1,7 @@
+profile : prod
+server :
+  port: 8100
+
+logging:
+  level:
+    org.springframework : info

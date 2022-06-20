@@ -1,0 +1,8 @@
+profile: local
+
+server :
+  port: 8111
+
+logging:
+  level:
+    org.springframework : info
