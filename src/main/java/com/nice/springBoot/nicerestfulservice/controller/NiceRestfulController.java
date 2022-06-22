@@ -9,16 +9,25 @@ import com.nice.springBoot.nicerestfulservice.service.UserDeoService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.MessageSource;
+import org.springframework.hateoas.CollectionModel;
+import org.springframework.hateoas.EntityModel;
+import org.springframework.hateoas.Link;
+import org.springframework.hateoas.server.mvc.WebMvcLinkBuilder;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.json.MappingJacksonValue;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.LocaleResolver;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
+import javax.swing.text.html.parser.Entity;
 import javax.validation.Valid;
 import java.net.URI;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+
+import static org.springframework.hateoas.server.mvc.WebMvcLinkBuilder.linkTo;
+import static org.springframework.hateoas.server.mvc.WebMvcLinkBuilder.methodOn;
 
 @Slf4j
 @RestController
@@ -36,13 +45,25 @@ public class NiceRestfulController {
     }
 
     @GetMapping(value = "")
-    public MappingJacksonValue retrieveAllUsers(){
+    public ResponseEntity<CollectionModel<EntityModel<User>>> retrieveAllUsers(){
+        List<EntityModel<User>> result = new ArrayList<>();
         List<User> users = userDeoService.findAll();
-        SimpleBeanPropertyFilter simpleBeanPropertyFilter = SimpleBeanPropertyFilter.filterOutAllExcept("id","name","ssn","joinDate");
-        FilterProvider filter = new SimpleFilterProvider().addFilter("UserInfo",simpleBeanPropertyFilter);
-        MappingJacksonValue mapping = new MappingJacksonValue(users);
-        mapping.setFilters(filter);
-        return mapping;
+        //Hateos 이용하기 위해 엔티티 모델 선언
+        for(User user : users){
+            EntityModel entityModel = EntityModel.of(users);
+            //웹링크선언해서 현재 클래스의 요청처리 메소드를 연결해줌(그러면 해당 링크값이 생성됨)
+            Link linkTo = linkTo(methodOn(this.getClass()).retrieveUserById(user.getId())).withRel("View");
+            //엔티티모델과 웹링크 연결(엔티티모델 객체 각각에 링크값이 추가됨)
+            entityModel.add(linkTo.withRel("all-users"));
+            result.add(entityModel); // 리턴객체에 각 엔티티들 추가해준다
+        }
+        return ResponseEntity.ok(CollectionModel.of(result, linkTo(methodOn(this.getClass()).retrieveAllUsers()).withSelfRel()));
+
+//        SimpleBeanPropertyFilter simpleBeanPropertyFilter = SimpleBeanPropertyFilter.filterOutAllExcept("id","name","ssn","joinDate");
+//        FilterProvider filter = new SimpleFilterProvider().addFilter("UserInfo",simpleBeanPropertyFilter);
+//        MappingJacksonValue mapping = new MappingJacksonValue(users);
+//        mapping.setFilters(filter);
+//        return mapping;
     }
 
     @PostMapping(value = "")
@@ -59,27 +80,42 @@ public class NiceRestfulController {
     }
 
     @GetMapping(value = "/{id}")
-    public MappingJacksonValue retrieveUserById(@PathVariable(value = "id")int userId) throws UserNotFoundException {
+    public ResponseEntity retrieveUserById(@PathVariable(value = "id")int userId) throws UserNotFoundException {
         User user = userDeoService.findUserById(userId);
         //예외처리
         if(user == null){
             throw new UserNotFoundException(String.format("UserNotFoundException : [%d]",userId));
         }
-        SimpleBeanPropertyFilter simpleBeanPropertyFilter = SimpleBeanPropertyFilter.filterOutAllExcept("id","name","joinDate");
-        FilterProvider filter = new SimpleFilterProvider().addFilter("UserInfo",simpleBeanPropertyFilter);
-        MappingJacksonValue mapping = new MappingJacksonValue(user);
-        mapping.setFilters(filter);
-        return mapping;
+//        SimpleBeanPropertyFilter simpleBeanPropertyFilter = SimpleBeanPropertyFilter.filterOutAllExcept("id","name","joinDate");
+//        FilterProvider filter = new SimpleFilterProvider().addFilter("UserInfo",simpleBeanPropertyFilter);
+//        MappingJacksonValue mapping = new MappingJacksonValue(user);
+//        mapping.setFilters(filter);
+//        return mapping;
+        //Hateos 이용하기 위해 엔티티 모델 선언
+        EntityModel entityModel = EntityModel.of(user);
+        //웹링크선언
+        WebMvcLinkBuilder linkTo = linkTo(methodOn(this.getClass()).retrieveUserById(userId));
+        //엔티티모델과 웹링크 연결
+        entityModel.add(linkTo.withRel("all-users"));
+
+        return ResponseEntity.ok(entityModel);
     }
 
     @DeleteMapping(value = "/{id}")
-    public User deleteByUserId(@PathVariable(value = "id") int userId){
+    public ResponseEntity deleteByUserId(@PathVariable(value = "id") int userId){
         log.info("delete request id=>" + userId);
         User user = userDeoService.deleteByUserId(userId);
         if(user == null){
             throw new UserNotFoundException(String.format("User Not Found : [ %d ]",userId));
         }
-        return user;
+        //Hateos 이용하기 위해 엔티티 모델 선언
+        EntityModel entityModel = EntityModel.of(user);
+        //웹링크선언
+        WebMvcLinkBuilder linkTo = linkTo(methodOn(this.getClass()).retrieveAllUsers());
+        //엔티티모델과 웹링크 연결
+        entityModel.add(linkTo.withRel("all-users"));
+
+        return ResponseEntity.ok(entityModel);
     }
 
     @PutMapping(value="/{id}")
