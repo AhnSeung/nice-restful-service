@@ -9,6 +9,13 @@ logging:
 spring:
   messages:
     basename : messages
+    fallback-to-system-locale: false
   mvc:
     pathmatch:
       matching-strategy: ant_path_matcher
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "*"

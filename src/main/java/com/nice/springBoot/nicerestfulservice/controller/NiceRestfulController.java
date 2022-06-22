@@ -6,6 +6,9 @@ import com.fasterxml.jackson.databind.ser.impl.SimpleFilterProvider;
 import com.nice.springBoot.nicerestfulservice.customException.UserNotFoundException;
 import com.nice.springBoot.nicerestfulservice.entity.User;
 import com.nice.springBoot.nicerestfulservice.service.UserDeoService;
+import io.swagger.annotations.ApiImplicitParam;
+import io.swagger.annotations.ApiImplicitParams;
+import io.swagger.annotations.ApiOperation;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.MessageSource;
@@ -45,16 +48,22 @@ public class NiceRestfulController {
     }
 
     @GetMapping(value = "")
+    @ApiOperation(value="전체 사용자 목록 조회",notes = "등록된 전체 사용자의 목록을 조회합니다.")
+    @ApiImplicitParams(
+            {
+                    @ApiImplicitParam(name = "id",value="사용자 ID", required = true)
+            }
+    )
     public ResponseEntity<CollectionModel<EntityModel<User>>> retrieveAllUsers(){
         List<EntityModel<User>> result = new ArrayList<>();
         List<User> users = userDeoService.findAll();
         //Hateos 이용하기 위해 엔티티 모델 선언
         for(User user : users){
-            EntityModel entityModel = EntityModel.of(users);
+            EntityModel entityModel = EntityModel.of(user);
             //웹링크선언해서 현재 클래스의 요청처리 메소드를 연결해줌(그러면 해당 링크값이 생성됨)
-            Link linkTo = linkTo(methodOn(this.getClass()).retrieveUserById(user.getId())).withRel("View");
+            //Link linkTo = linkTo(methodOn(this.getClass()).retrieveUserById(user.getId())).withRel("View");
             //엔티티모델과 웹링크 연결(엔티티모델 객체 각각에 링크값이 추가됨)
-            entityModel.add(linkTo.withRel("all-users"));
+            entityModel.add(linkTo(methodOn(this.getClass()).retrieveUserById(user.getId())).withRel("View"));
             result.add(entityModel); // 리턴객체에 각 엔티티들 추가해준다
         }
         return ResponseEntity.ok(CollectionModel.of(result, linkTo(methodOn(this.getClass()).retrieveAllUsers()).withSelfRel()));
@@ -65,21 +74,8 @@ public class NiceRestfulController {
 //        mapping.setFilters(filter);
 //        return mapping;
     }
-
-    @PostMapping(value = "")
-    public ResponseEntity<User> createUser(@Valid @RequestBody User user){
-        log.info("create user info => " + user.toString());
-        User saveInfo = userDeoService.save(user);
-        //현재 요청온 path에다가 추가적으로 뒤에 커스트마이징된 path(등록된 ID 객체 이용해서) 추가해서 URI형태로 만든다
-        URI location = ServletUriComponentsBuilder.fromCurrentRequest().path("/{id}").buildAndExpand(saveInfo.getId()).toUri();
-        //String msg = String.format("Registered your ID : [%d]",userDeoService.save(user).getId());
-        //URI 형태로 만든 location값을 리턴한다
-        //리턴된 경로가 유저 상세 정보 페이지를 볼 수 있는 경로랑 매칭 가능하다
-        //본인의 ID를 알 수 있으면서 상세정보 요청 경로라 볼 수 있기에 Rest-API 설계시 좋다(연관정보를 리턴 해주니깐?)
-        return ResponseEntity.created(location).build();
-    }
-
     @GetMapping(value = "/{id}")
+    @ApiOperation(value="사용자 상세정보 조회",notes = "사용자 ID를 이용하여 특정사용자의 상세정보를 조회합니다.")
     public ResponseEntity retrieveUserById(@PathVariable(value = "id")int userId) throws UserNotFoundException {
         User user = userDeoService.findUserById(userId);
         //예외처리
@@ -96,10 +92,25 @@ public class NiceRestfulController {
         //웹링크선언
         WebMvcLinkBuilder linkTo = linkTo(methodOn(this.getClass()).retrieveUserById(userId));
         //엔티티모델과 웹링크 연결
-        entityModel.add(linkTo.withRel("all-users"));
+        entityModel.add(linkTo.withRel("user"));
 
         return ResponseEntity.ok(entityModel);
     }
+
+    @PostMapping(value = "")
+    public ResponseEntity<User> createUser(@Valid @RequestBody User user){
+        log.info("create user info => " + user.toString());
+        User saveInfo = userDeoService.save(user);
+        //현재 요청온 path에다가 추가적으로 뒤에 커스트마이징된 path(등록된 ID 객체 이용해서) 추가해서 URI형태로 만든다
+        URI location = ServletUriComponentsBuilder.fromCurrentRequest().path("/{id}").buildAndExpand(saveInfo.getId()).toUri();
+        //String msg = String.format("Registered your ID : [%d]",userDeoService.save(user).getId());
+        //URI 형태로 만든 location값을 리턴한다
+        //리턴된 경로가 유저 상세 정보 페이지를 볼 수 있는 경로랑 매칭 가능하다
+        //본인의 ID를 알 수 있으면서 상세정보 요청 경로라 볼 수 있기에 Rest-API 설계시 좋다(연관정보를 리턴 해주니깐?)
+        return ResponseEntity.created(location).build();
+    }
+
+
 
     @DeleteMapping(value = "/{id}")
     public ResponseEntity deleteByUserId(@PathVariable(value = "id") int userId){
